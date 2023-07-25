@@ -37,6 +37,7 @@ router.post('/', async (req, res) => {
 
     try {
         await nouvarticle.save();
+        const articles = await Article.findById(response._id).populate("scategorieID").exec();
 
         res.status(200).json(nouvarticle);
     } catch (error) {
@@ -65,6 +66,7 @@ router.put('/:articleId', async (req, res) => {
             { $set: req.body },
             { new: true }
         );
+        const articles = await Article.findById(art._id).populate("scategorieID").exec();
         res.status(200).json(art);
     } catch (error) {
         res.status(404).json({ message: error.message });
