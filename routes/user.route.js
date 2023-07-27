@@ -1,6 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const User = require("../models/user")
+const bcrypt = require('bcrypt')
+const jwt = require('jsonwebtoken')
+
+const nodemailer = require('nodemailer');
+var transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: 'gratiachraf1@gmail.com',
+        pass: 'onqzaatbfbzvhtzg'
+
+    },
+    tls: {
+        rejectUnauthorized: false
+    }
+})
 // créer un nouvel utilisateur
 router.post('/register', async (req, res) => {
     try {
@@ -14,6 +29,25 @@ router.post('/register', async (req, res) => {
 
         const newUser = new User({ email, password, firstname, lastname })
         const createdUser = await newUser.save()
+        // Envoyer l'e-mail de confirmation de l'inscription
+        var mailOption = {
+            from: '"verify your email " <gratiachraf1@gmail.com>',
+            to: newUser.email,
+            subject: 'vérification your email ',
+            html: `<h2>${newUser.firstname}! thank you for registreting on our website</h2>
+    <h4>please verify your email to procced.. </h4>
+    <a
+    href="http://${req.headers.host}/api/user/status/edit?email=${newUser.email}">click
+    here</a>`
+        }
+        transporter.sendMail(mailOption, function (error, info) {
+            if (error) {
+                console.log(error)
+            }
+            else {
+                console.log('verification email sent to your gmail account ')
+            }
+        })
         return res.status(201).send({
             success: true, message: "Account created successfully", user: createdUser
         })
@@ -46,4 +80,74 @@ router.get('/status/edit/', async (req, res) => {
         return res.status(404).send({ success: false, message: err })
     }
 })
+
+// se connecter
+router.post('/login', async (req, res) => {
+    try {
+        let { email, password } = req.body
+
+        if (!email || !password) {
+
+
+
+            return res.status(404).send({
+                success: false, message: "All fields are required"
+            })
+
+        }
+
+        let user = await User.findOne({
+            email
+        }).select('+password').select('+isActive')
+
+        if (!user) {
+
+            return res.status(404).send({
+                success: false, message: "Account doesn't exists"
+            })
+
+        } else {
+
+            let isCorrectPassword = await bcrypt.compare(password, user.password)
+            if (isCorrectPassword) {
+
+                delete user._doc.password
+                if (!user.isActive) return res.status(200).send({
+                    success:
+
+                        false, message: 'Your account is inactive, Please contact you administrator'
+                })
+
+                const token = jwt.sign({
+                    iduser:
+
+                        user._id, name: user.firstname, role: user.role
+                }, process.env.SECRET, {
+                    expiresIn: "1h",
+                })
+
+                return res.status(200).send({ success: true, user, token })
+
+            } else {
+
+                return res.status(404).send({
+                    success: false, message:
+
+                        "Please verify your credentials"
+                })
+
+
+
+            }
+
+        }
+
+    } catch (err) {
+        return res.status(404).send({
+            success: false, message: err.message
+
+        })
+    }
+
+});
 module.exports = router;
